@@ -117,7 +117,11 @@ int main(int argc, char** argv) {
           { &data[0], data_size }
         };
         struct msghdr msg = { NULL, 0, iov, 2, NULL, 0, 0 };
-        CHECK(sendmsg(fds[0], &msg, MSG_NOSIGNAL) == ssize_t(total_size));
+        int flags = 0;
+#ifndef __APPLE__
+        flags |= MSG_NOSIGNAL;
+#endif
+        CHECK(sendmsg(fds[0], &msg, flags) == ssize_t(total_size));
         break;
       }
     }
