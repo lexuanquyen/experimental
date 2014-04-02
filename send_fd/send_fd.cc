@@ -40,7 +40,11 @@ int main(int argc, char** argv) {
     msg.msg_controllen = cmsg->cmsg_len;
     close(new_fd);
 
-    ssize_t result = sendmsg(fds[0], &msg, MSG_NOSIGNAL);
+    int flags = 0;
+#ifndef __APPLE__
+    flags |= MSG_NOSIGNAL;
+#endif
+    ssize_t result = sendmsg(fds[0], &msg, flags);
     CHECK(result <= 0);
     if (result != 0) {
       perror(argv[0]);
