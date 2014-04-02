@@ -22,7 +22,12 @@ int main(int argc, char** argv) {
   CHECK(fcntl(fds[0], F_SETFL, O_NONBLOCK) == 0);
   CHECK(fcntl(fds[1], F_SETFL, O_NONBLOCK) == 0);
 
-  for (int i = 0; i < 1000000; i++) {
+  int num = 1000000;
+  if (argc >= 2)
+    num = atoi(argv[1]);
+  CHECK(num >= 0);
+
+  for (int i = 0; i < num; i++) {
     const size_t kNumFDs = 1;
 
     char buf[CMSG_SPACE(kNumFDs * sizeof(int))];
@@ -38,7 +43,6 @@ int main(int argc, char** argv) {
     CHECK(new_fd != fds[0]);
     reinterpret_cast<int*>(CMSG_DATA(cmsg))[0] = new_fd;
     msg.msg_controllen = cmsg->cmsg_len;
-    close(new_fd);
 
     int flags = 0;
 #ifndef __APPLE__
@@ -48,8 +52,11 @@ int main(int argc, char** argv) {
     CHECK(result <= 0);
     if (result != 0) {
       perror(argv[0]);
+      printf("i = %d\n", i);
       return 1;
     }
+
+    close(new_fd);
   }
 
   return 0;
