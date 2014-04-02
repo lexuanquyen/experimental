@@ -18,6 +18,32 @@
       } \
     } while (false)
 
+void PrintResultAndErrno(ssize_t result) {
+  if (result < 0) {
+    printf("result = %ld, error = %d (%s)\n",
+           static_cast<long>(result), errno, strerror(errno));
+  } else {
+    printf("result = %ld\n", static_cast<long>(result));
+  }
+}
+
+void DoReceive(int fd) {
+  static const size_t kMaxReceiveFDs = 20;
+
+  printf("Receiving a message ...\n");
+  char buf[1000] = {};
+  struct iovec iov = { buf, sizeof(buf) };
+  char cmsg_buf[CMSG_SPACE(sizeof(int) * kMaxReceiveFDs)];
+  struct msghdr msg = {};
+  msg.msg_iov = &iov;
+  msg.msg_iovlen = 1;
+  msg.msg_control = cmsg_buf;
+  msg.msg_controllen = sizeof(cmsg_buf);
+
+  ssize_t result = recvmsg(fd, &msg, MSG_DONTWAIT);
+  PrintResultAndErrno(result);
+}
+
 int main(int argc, char** argv) {
   int fds[2];
   CHECK(socketpair(AF_UNIX, SOCK_STREAM, 0, fds) == 0);
@@ -30,7 +56,7 @@ int main(int argc, char** argv) {
   CHECK(num >= 0);
 
   for (int i = 0; i < num; i++) {
-    const size_t kNumFDs = 1;
+    static const size_t kNumFDs = 1;
 
     char buf[CMSG_SPACE(kNumFDs * sizeof(int))];
     // Note: The sendmsg() below *always* fails on Mac if we don't write at
@@ -58,10 +84,8 @@ int main(int argc, char** argv) {
     ssize_t result = sendmsg(fds[0], &msg, flags);
     CHECK(result <= 1);
     if (result != 1) {
-      int err = errno;
-      perror(argv[0]);
-      printf("i = %d, result = %d, error = %d (%s)\n", i,
-             static_cast<int>(result), err, strerror(err));
+      printf("Failed sendmsg (with FD) at i = %d\n", i);
+      PrintResultAndErrno(result);
 
       // Can send another?
       struct iovec iov = { const_cast<char*>("x"), 1 };
@@ -72,11 +96,11 @@ int main(int argc, char** argv) {
 #ifndef __APPLE__
       flags |= MSG_NOSIGNAL;
 #endif
-      ssize_t result = sendmsg(fds[0], &msg, flags);
-      printf("--> send another: %d\n", static_cast<int>(result));
-      if (result != 1)
-        perror("sendmsg");
+      printf("Send another with no FDs ... \n");
+      result = sendmsg(fds[0], &msg, flags);
+      PrintResultAndErrno(result);
 
+      DoReceive(fds[1]);
 
       return 1;
     }
