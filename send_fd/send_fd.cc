@@ -42,6 +42,23 @@ void DoReceive(int fd) {
 
   ssize_t result = recvmsg(fd, &msg, MSG_DONTWAIT);
   PrintResultAndErrno(result);
+  if (result < 0)
+    return;
+
+  CHECK(msg.msg_controllen != 0);
+  struct cmsghdr* cmsg = CMSG_FIRSTHDR(&msg);
+  CHECK(cmsg);
+  CHECK(cmsg->cmsg_level == SOL_SOCKET);
+  CHECK(cmsg->cmsg_type == SCM_RIGHTS);
+  CHECK(cmsg->cmsg_len >= CMSG_LEN(0));
+  size_t payload_length = cmsg->cmsg_len - CMSG_LEN(0);
+  CHECK(payload_length % sizeof(int) == 0);
+  size_t num_received_fds = payload_length / sizeof(int);
+  printf("Received %lu FDs ...\n",
+         static_cast<unsigned long>(num_received_fds));
+  const int* received_fds = reinterpret_cast<int*>(CMSG_DATA(cmsg));
+  CHECK(num_received_fds >= 1);
+  CHECK(close(received_fds[0]) == 0);
 }
 
 int main(int argc, char** argv) {
