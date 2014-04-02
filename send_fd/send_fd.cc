@@ -62,6 +62,22 @@ int main(int argc, char** argv) {
       perror(argv[0]);
       printf("i = %d, result = %d, error = %d (%s)\n", i,
              static_cast<int>(result), err, strerror(err));
+
+      // Can send another?
+      struct iovec iov = { const_cast<char*>("x"), 1 };
+      struct msghdr msg = {};
+      msg.msg_iov = &iov;
+      msg.msg_iovlen = 1;
+      int flags = 0;
+#ifndef __APPLE__
+      flags |= MSG_NOSIGNAL;
+#endif
+      ssize_t result = sendmsg(fds[0], &msg, flags);
+      printf("--> send another: %d\n", static_cast<int>(result));
+      if (result != 1)
+        perror("sendmsg");
+
+
       return 1;
     }
 
