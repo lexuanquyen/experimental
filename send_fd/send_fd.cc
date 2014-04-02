@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -31,7 +32,12 @@ int main(int argc, char** argv) {
     const size_t kNumFDs = 1;
 
     char buf[CMSG_SPACE(kNumFDs * sizeof(int))];
+    // Note: The sendmsg() below *always* fails on Mac if we don't write at
+    // least one character.
+    struct iovec iov = { const_cast<char*>("x"), 1 };
     struct msghdr msg = {};
+    msg.msg_iov = &iov;
+    msg.msg_iovlen = 1;
     msg.msg_control = buf;
     msg.msg_controllen = sizeof(buf);
     struct cmsghdr* cmsg = CMSG_FIRSTHDR(&msg);
@@ -49,10 +55,12 @@ int main(int argc, char** argv) {
     flags |= MSG_NOSIGNAL;
 #endif
     ssize_t result = sendmsg(fds[0], &msg, flags);
-    CHECK(result <= 0);
-    if (result != 0) {
+    CHECK(result <= 1);
+    if (result != 1) {
+      int err = errno;
       perror(argv[0]);
-      printf("i = %d\n", i);
+      printf("i = %d, result = %d, error = %d (%s)\n", i,
+             static_cast<int>(result), err, strerror(err));
       return 1;
     }
 
