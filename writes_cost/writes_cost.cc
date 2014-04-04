@@ -22,12 +22,13 @@ int main(int argc, char** argv) {
     fprintf(stderr, "usage: %s MODE HEADER_SIZE DATA_SIZE\n\n"
         "MODE:\n"
         "  one_write -- one write()\n"
-        "  two_writes -- two writes()\n"
+        "  two_writes -- two write()s\n"
         "  two_copies_one_write -- two memcpy()s and one write()\n"
         "  one_writev -- one writev() (two buffers)\n"
         "  one_writev_split_data -- one writev() (three buffers; data split)\n"
         "  one_writev_one_buffer -- one writev() (one buffer)\n"
         "  one_send -- one send()\n"
+        "  two_sends -- two send()s\n"
         "  one_sendmsg -- one sendmsg() (two buffers)\n"
         "  one_sendmsg_split_data -- one sendmsg() "
             "(three buffers; data split)\n",
@@ -37,8 +38,8 @@ int main(int argc, char** argv) {
 
   enum {
     kDoOneWrite, kDoTwoWrites, kDoTwoCopiesOneWrite, kDoOneWritev,
-    kDoOneWritevSplitData, kDoOneWritevOneBuffer, kDoOneSend, kDoOneSendmsg,
-    kDoOneSendmsgSplitData
+    kDoOneWritevSplitData, kDoOneWritevOneBuffer, kDoOneSend, kDoTwoSends,
+    kDoOneSendmsg, kDoOneSendmsgSplitData
   } do_what;
   if (strcmp(argv[1], "one_write") == 0)
     do_what = kDoOneWrite;
@@ -54,6 +55,8 @@ int main(int argc, char** argv) {
     do_what = kDoOneWritevSplitData;
   else if (strcmp(argv[1], "one_send") == 0)
     do_what = kDoOneSend;
+  else if (strcmp(argv[1], "two_sends") == 0)
+    do_what = kDoTwoSends;
   else if (strcmp(argv[1], "one_sendmsg") == 0)
     do_what = kDoOneSendmsg;
   else if (strcmp(argv[1], "one_sendmsg_split_data") == 0)
@@ -128,6 +131,12 @@ int main(int argc, char** argv) {
       case kDoOneSend:
         CHECK(send(fds[0], &total[0], total_size, kSendFlags) ==
                    ssize_t(total_size));
+        break;
+      case kDoTwoSends:
+        CHECK(send(fds[0], &header[0], header_size, kSendFlags) ==
+            ssize_t(header_size));
+        CHECK(send(fds[0], &data[0], data_size, kSendFlags) ==
+            ssize_t(data_size));
         break;
       case kDoOneSendmsg: {
         struct iovec iov[2] = {
