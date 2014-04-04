@@ -28,14 +28,17 @@ int main(int argc, char** argv) {
         "  one_writev_split_data -- one writev() (three buffers; data split)\n"
         "  one_writev_one_buffer -- one writev() (one buffer)\n"
         "  one_send -- one send()\n"
-        "  one_sendmsg -- one sendmsg() (two buffers)\n",
+        "  one_sendmsg -- one sendmsg() (two buffers)\n"
+        "  one_sendmsg_split_data -- one sendmsg() "
+            "(three buffers; data split)\n",
         argv[0]);
     return 1;
   }
 
   enum {
     kDoOneWrite, kDoTwoWrites, kDoTwoCopiesOneWrite, kDoOneWritev,
-    kDoOneWritevSplitData, kDoOneWritevOneBuffer, kDoOneSend, kDoOneSendmsg
+    kDoOneWritevSplitData, kDoOneWritevOneBuffer, kDoOneSend, kDoOneSendmsg,
+    kDoOneSendmsgSplitData
   } do_what;
   if (strcmp(argv[1], "one_write") == 0)
     do_what = kDoOneWrite;
@@ -53,6 +56,8 @@ int main(int argc, char** argv) {
     do_what = kDoOneSend;
   else if (strcmp(argv[1], "one_sendmsg") == 0)
     do_what = kDoOneSendmsg;
+  else if (strcmp(argv[1], "one_sendmsg_split_data") == 0)
+    do_what = kDoOneSendmsgSplitData;
   else
     CHECK(false);
 
@@ -130,6 +135,16 @@ int main(int argc, char** argv) {
           { &data[0], data_size }
         };
         struct msghdr msg = { NULL, 0, iov, 2, NULL, 0, 0 };
+        CHECK(sendmsg(fds[0], &msg, kSendFlags) == ssize_t(total_size));
+        break;
+      }
+      case kDoOneSendmsgSplitData: {
+        struct iovec iov[3] = {
+          { &header[0], header_size },
+          { &data[0], data_size / 2 },
+          { &data[data_size / 2], data_size - (data_size / 2) }
+        };
+        struct msghdr msg = { NULL, 0, iov, 3, NULL, 0, 0 };
         CHECK(sendmsg(fds[0], &msg, kSendFlags) == ssize_t(total_size));
         break;
       }
