@@ -27,6 +27,7 @@ int main(int argc, char** argv) {
         "  one_writev -- one writev() (two buffers)\n"
         "  one_writev_split_data -- one writev() (three buffers; data split)\n"
         "  one_writev_one_buffer -- one writev() (one buffer)\n"
+        "  one_send -- one send()\n"
         "  one_sendmsg -- one sendmsg() (two buffers)\n",
         argv[0]);
     return 1;
@@ -34,7 +35,7 @@ int main(int argc, char** argv) {
 
   enum {
     kDoOneWrite, kDoTwoWrites, kDoTwoCopiesOneWrite, kDoOneWritev,
-    kDoOneWritevSplitData, kDoOneWritevOneBuffer, kDoOneSendmsg
+    kDoOneWritevSplitData, kDoOneWritevOneBuffer, kDoOneSend, kDoOneSendmsg
   } do_what;
   if (strcmp(argv[1], "one_write") == 0)
     do_what = kDoOneWrite;
@@ -48,6 +49,8 @@ int main(int argc, char** argv) {
     do_what = kDoOneWritevSplitData;
   else if (strcmp(argv[1], "one_writev_one_buffer") == 0)
     do_what = kDoOneWritevSplitData;
+  else if (strcmp(argv[1], "one_send") == 0)
+    do_what = kDoOneSend;
   else if (strcmp(argv[1], "one_sendmsg") == 0)
     do_what = kDoOneSendmsg;
   else
@@ -73,6 +76,12 @@ int main(int argc, char** argv) {
   memcpy(&total[0], &header[0], header_size);
   memcpy(&total[header_size], &data[0], data_size);
   std::vector<char> read_buffer(total_size);
+
+#ifdef __APPLE__
+  static const int kSendFlags = 0;
+#else
+  static const int kSendFlags = MSG_NOSIGNAL;
+#endif
   for (int i = 0; i < 1000000; i++) {
     switch (do_what) {
       case kDoOneWrite:
@@ -111,17 +120,17 @@ int main(int argc, char** argv) {
         CHECK(writev(fds[0], iov, 1) == ssize_t(total_size));
         break;
       }
+      case kDoOneSend:
+        CHECK(send(fds[0], &total[0], total_size, kSendFlags) ==
+                   ssize_t(total_size));
+        break;
       case kDoOneSendmsg: {
         struct iovec iov[2] = {
           { &header[0], header_size },
           { &data[0], data_size }
         };
         struct msghdr msg = { NULL, 0, iov, 2, NULL, 0, 0 };
-        int flags = 0;
-#ifndef __APPLE__
-        flags |= MSG_NOSIGNAL;
-#endif
-        CHECK(sendmsg(fds[0], &msg, flags) == ssize_t(total_size));
+        CHECK(sendmsg(fds[0], &msg, kSendFlags) == ssize_t(total_size));
         break;
       }
     }
